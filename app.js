@@ -37,11 +37,20 @@ function home() {
     <label>Courses<input id="n" type="number" value="5" min="1" max="20"></label>
     <label>Planned days<input id="d" type="number" value="30" min="1"></label>
     <label>Current day<input id="c" type="number" value="1" min="1"></label>
+    <label>Custom URL <span class="muted">(optional)</span><input id="custom-slug" type="text" placeholder="my-course-tracker" maxlength="32" autocomplete="off"></label>
+    <label>Custom edit code <span class="muted">(optional)</span><input id="custom-code" type="password" placeholder="Choose your edit code" autocomplete="new-password"></label>
     <button id="go">Create tracker</button>
   </div><p id="err" class="err"></p>`;
   $("#go").onclick = async () => {
     const n = num($("#n").value, 1, 20),
       total = num($("#d").value, 1, 3650);
+    const customSlug = $("#custom-slug").value.trim().toLowerCase();
+    const customCode = $("#custom-code").value.trim();
+    if (customSlug && !/^[a-z0-9_-]{3,32}$/.test(customSlug)) {
+      $("#err").textContent =
+        "Custom URL must be 3–32 characters using only letters, numbers, hyphens, or underscores.";
+      return;
+    }
     const d = {
       totalDays: total,
       currentDay: num($("#c").value, 1, total),
@@ -51,15 +60,23 @@ function home() {
         pct: 0,
       })),
     };
-    const s = newSlug(),
-      k = newCode();
+    const s = customSlug || newSlug();
+    const k = customCode || newCode();
     try {
+      if (customSlug && (await getPage(s))) {
+        $("#err").textContent =
+          "That custom URL is already in use. Please choose another one.";
+        return;
+      }
       await createPage(s, k, d);
       localStorage.setItem(key(s), k);
-      sessionStorage.setItem("new:" + s, k);
+      if (!customCode) sessionStorage.setItem("new:" + s, k);
       location.hash = "#/" + s;
     } catch (e) {
-      $("#err").textContent = e.message;
+      $("#err").textContent =
+        customSlug && /duplicate|already exists|unique/i.test(e.message)
+          ? "That custom URL is already in use. Please choose another one."
+          : e.message;
     }
   };
 }
